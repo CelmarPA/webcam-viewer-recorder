@@ -55,14 +55,13 @@ class AppWindow:
             messagebox.showerror("Error", "No microphone detected.")
             self.root.destroy()
             return
+
         self.selected_microphone: str = self.settings.get("microphone", self.microphones[0])
         if self.selected_microphone not in self.microphones:
             self.selected_microphone = self.microphones[0]
 
-        # ---------- BRIGHTNESS / CONTRAST ----------
-        self.brightness_var = tk.DoubleVar(value=self.settings.get("brightness", 1.0))
-        self.contrast_var = tk.DoubleVar(value=self.settings.get("contrast", 1.0))
-        self.saturation_var = tk.DoubleVar(value=self.settings.get("saturation", 1.0))
+        self.audio_service = AudioCaptureService()
+        self.audio_service.device_name = self.selected_microphone
 
         # ---------- SERVICES ----------
         self.audio_service = AudioCaptureService()
@@ -78,15 +77,26 @@ class AppWindow:
                 res_tuple = tuple(int(x) for x in self.selected_resolution.lower().replace(" ", "x").split("x"))
             except ValueError:
                 res_tuple = (w, h)
-            fps_list = self.camera_caps.get(res_tuple, [30])
-            self.selected_fps = self.settings.get("fps", fps_list[0])
         else:
             self.selected_resolution = "1280x720"
-            self.selected_fps = 30
+            res_tuple = (1280, 720)
+
+        # Pega o FPS real do dispositivo
+        if self.camera_caps and res_tuple in self.camera_caps:
+            fps_list = self.camera_caps[res_tuple]
+            self.selected_fps = fps_list[0]  # pega o FPS nativo da câmera
+        else:
+            self.selected_fps = 30  # fallback
 
         w, h = map(int, self.selected_resolution.split("x"))
         self.video_service.resolution = (w, h)
-        self.video_service.fps_target = self.selected_fps
+        self.video_service.fps_target = self.selected_fps  # agora é automático
+
+
+        # Antes de criar o RecorderManager
+        self.brightness_var = tk.DoubleVar(value=self.settings.get("brightness", 1.0))
+        self.contrast_var = tk.DoubleVar(value=self.settings.get("contrast", 1.0))
+        self.saturation_var = tk.DoubleVar(value=self.settings.get("saturation", 1.0))
 
         # ---------- RECORDER ----------
         self.recorder = RecorderManager(
@@ -96,6 +106,7 @@ class AppWindow:
         )
         self.recorder.brightness = self.brightness_var.get()
         self.recorder.contrast = self.contrast_var.get()
+        self.recorder.saturation = self.saturation_var.get()
 
         # ---------- STATE ----------
         self.tk_image: Optional[ImageTk.PhotoImage] = None
@@ -167,37 +178,39 @@ class AppWindow:
         self.resolution_combo.grid(row=2, column=1, padx=5, sticky="w")
         self.resolution_combo.bind("<<ComboboxSelected>>", self._on_resolution_change)
 
-        # FPS
-        ttk.Label(settings, text="FPS").grid(row=2, column=2, padx=5, sticky="w")
-        self.fps_var = tk.IntVar(value=self.selected_fps)
-        self.fps_combo = ttk.Combobox(settings, values=[10, 20, 30, 60, 120], textvariable=self.fps_var, state="readonly")
-        self.fps_combo.grid(row=2, column=3, padx=5, sticky="w")
-        self.fps_combo.bind("<<ComboboxSelected>>", self._on_fps_change)
-
-        # Brightness / Contrast sliders
+        # ================== Preview Adjustments ==================
+        # LabelFrame para ajustes
         adjustments = ttk.LabelFrame(main, text="Preview Adjustments")
         adjustments.pack(fill="x", padx=10, pady=6)
-        ttk.Label(adjustments, text="Brightness").grid(row=0, column=0, padx=5, sticky="w")
-        self.brightness_slider = ttk.Scale(adjustments, from_=0.0, to=2.0, orient="horizontal", variable=self.brightness_var)
-        self.brightness_slider.grid(row=0, column=1, sticky="ew", padx=5)
-        self.brightness_slider.config(command=self._on_brightness_change)
 
-        ttk.Label(adjustments, text="Contrast").grid(row=1, column=0, padx=5, sticky="w")
-        self.contrast_slider = ttk.Scale(adjustments, from_=0.0, to=3.0, orient="horizontal", variable=self.contrast_var)
-        self.contrast_slider.grid(row=1, column=1, sticky="ew", padx=5)
-        self.contrast_slider.config(command=self._on_contrast_change)
+        # Coluna 1 (onde os sliders ficam) deve expandir
         adjustments.columnconfigure(1, weight=1)
 
-        # ================== Saturation ==================
-        ttk.Label(adjustments, text="Saturation").grid(row=2, column=0, padx=5, sticky="w")
-        self.saturation_var = tk.DoubleVar(value=self.settings.get("saturation", 1.0))
-        self.saturation_slider = ttk.Scale(
-            adjustments, from_=0.0, to=3.0, orient="horizontal", variable=self.saturation_var
-        )
-        self.saturation_slider.grid(row=2, column=1, sticky="ew", padx=5)
-        self.saturation_slider.config(command=self._on_saturation_change)
+        # Brightness
+        ttk.Label(adjustments, text="Brightness").grid(row=0, column=0, padx=5, sticky="w")
+        self.brightness_slider = ttk.Scale(adjustments, from_=0.0, to=2.0, orient="horizontal",
+                                        variable=self.brightness_var, command=self._on_brightness_change)
+        self.brightness_slider.grid(row=0, column=1, sticky="ew", padx=5)
 
-        self.status = ttk.Label(main, text="Status: IDLE")
+        # Contrast
+        ttk.Label(adjustments, text="Contrast").grid(row=1, column=0, padx=5, sticky="w")
+        self.contrast_slider = ttk.Scale(adjustments, from_=0.0, to=3.0, orient="horizontal",
+                                        variable=self.contrast_var, command=self._on_contrast_change)
+        self.contrast_slider.grid(row=1, column=1, sticky="ew", padx=5)
+
+        # Saturation
+        ttk.Label(adjustments, text="Saturation").grid(row=2, column=0, padx=5, sticky="w")
+        self.saturation_slider = ttk.Scale(adjustments, from_=0.0, to=3.0, orient="horizontal",
+                                        variable=self.saturation_var, command=self._on_saturation_change)
+        self.saturation_slider.grid(row=2, column=1, sticky="ew", padx=5)
+
+
+        self.status = ttk.Label(
+            main, 
+            text="Status: IDLE", 
+            font=("Helvetica", 12, "bold"), 
+            foreground="blue"
+        )
         self.status.pack(anchor="w", padx=10, pady=4)
 
     # ================= PREVIEW =================
@@ -238,35 +251,138 @@ class AppWindow:
             messagebox.showerror("Error", str(e))
 
     def stop_record(self) -> None:
-        try:
-            output_file = self.recorder.stop_recording()
-            if output_file:
-                self.status.config(text=f"Saved: {output_file}")
-            self.btn_start.config(state="normal")
-            self.btn_stop.config(state="disabled")
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+        """Stop recording safely and show status updates in the UI."""
+        def _stop_thread():
+            try:
+                # Chama o stop do recorder (merge vídeo + áudio)
+                output_file = self.recorder.stop_recording()
+                # Atualiza status na UI ao finalizar
+                status_text = f"Saved: {output_file}" if output_file else "Recording stopped."
+                self.root.after(0, lambda: self.status.config(text=status_text))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
+            finally:
+                # Reabilita botões
+                self.root.after(0, lambda: self.btn_start.config(state="normal"))
+                self.root.after(0, lambda: self.btn_stop.config(state="disabled"))
 
-    # ================= DEVICE CHANGES =================
+        # Bloqueia botão e mostra status "processando"
+        self.btn_stop.config(state="disabled")
+        self.status.config(text="Processando vídeo, aguarde…")
+        
+        # Executa o stop em thread separada para não travar a UI
+        threading.Thread(target=_stop_thread, daemon=True).start()
+
+
+    # ================= DEVICE & CONFIG CHANGES =================
+    def _change_camera(self, new_camera: str) -> None:
+        """Troca de câmera sem travar a GUI e atualiza resoluções disponíveis."""
+        def switch_camera():
+            self.camera_combo.config(state="disabled")
+            self.status.config(text=f"Changing camera to {new_camera}...")
+
+            # Para preview atual
+            self.recorder.video_service.stop_preview()
+
+            # Atualiza câmera
+            self.selected_camera_name = new_camera
+            self.selected_camera_index = int(self.camera_index_map[new_camera])
+            self.recorder.video_service.camera_index = self.selected_camera_index
+
+            # Atualiza capacidades da nova câmera
+            self.camera_caps = get_camera_capabilities_real(self.selected_camera_name, self.selected_camera_index)
+            if self.camera_caps:
+                # Atualiza lista de resoluções no combobox
+                res_values = [f"{w}x{h}" for w, h in sorted(self.camera_caps.keys(), reverse=True)]
+                self.resolution_combo['values'] = res_values
+
+                # Seleciona a primeira resolução por padrão
+                self.selected_resolution = res_values[0]
+                self.resolution_var.set(self.selected_resolution)
+
+                # Atualiza resolução no serviço de vídeo
+                w, h = map(int, self.selected_resolution.split("x"))
+                self.recorder.video_service.resolution = (w, h)
+
+                # Atualiza FPS para o FPS nativo dessa resolução
+                self.recorder.video_service.fps_target = self.camera_caps[(w, h)][0]
+
+            # Reinicia preview
+            self.start_preview()
+
+            # Atualiza status e desbloqueia combobox
+            self.status.config(text="Status: IDLE")
+            self.camera_combo.config(state="readonly")
+
+        threading.Thread(target=switch_camera, daemon=True).start()
+
+
     def _on_camera_change(self, event=None):
-        self.selected_camera_name = self.camera_var.get()
-        self.selected_camera_index = int(self.camera_index_map[self.selected_camera_name])
-        self.recorder.video_service.stop_preview()
-        self.recorder.video_service.camera_index = self.selected_camera_index
-        self.start_preview()
+        new_camera = self.camera_var.get()
+        self._change_camera(new_camera)
 
-    def _on_microphone_change(self, event=None) -> None:
-        self.selected_microphone = self.mic_var.get()
-        self.recorder.audio_service.device_name = self.selected_microphone
+    def _change_microphone(self, new_mic: str) -> None:
+        """Troca de microfone sem travar a GUI."""
+        def switch_mic():
+            self.mic_combo.config(state="disabled")
+            self.status.config(text=f"Changing microphone to {new_mic}...")
 
-    def _on_resolution_change(self, event=None) -> None:
-        self.selected_resolution = self.resolution_var.get()
-        w, h = map(int, self.selected_resolution.split("x"))
-        self.recorder.video_service.resolution = (w, h)
+            self.selected_microphone = new_mic
+            self.recorder.audio_service.device_name = new_mic
 
-    def _on_fps_change(self, event=None) -> None:
-        self.selected_fps = self.fps_var.get()
-        self.recorder.video_service.fps_target = self.selected_fps
+            self.status.config(text="Status: IDLE")
+            self.mic_combo.config(state="readonly")
+
+        threading.Thread(target=switch_mic, daemon=True).start()
+
+    def _on_microphone_change(self, event=None):
+        new_mic = self.mic_var.get()
+        self._change_microphone(new_mic)
+
+    def _change_resolution(self, new_res: str) -> None:
+        """Troca de resolução sem travar a GUI e reinicia o preview."""
+        def switch_res():
+            self.resolution_combo.config(state="disabled")
+            self.status.config(text=f"Changing resolution to {new_res}...")
+
+            # Atualiza resolução selecionada
+            self.selected_resolution = new_res
+            w, h = map(int, new_res.split("x"))
+            self.recorder.video_service.resolution = (w, h)
+
+            # Reinicia preview para aplicar a nova resolução
+            self.recorder.video_service.stop_preview()
+            self.start_preview()
+
+            self.status.config(text="Status: IDLE")
+            self.resolution_combo.config(state="readonly")
+
+        threading.Thread(target=switch_res, daemon=True).start()
+
+
+    def _on_resolution_change(self, event=None):
+        new_res = self.resolution_var.get()
+        self._change_resolution(new_res)
+
+    def _change_fps(self, new_fps: int) -> None:
+        """Troca de FPS sem travar a GUI."""
+        def switch_fps():
+            self.fps_combo.config(state="disabled")
+            self.status.config(text=f"Changing FPS to {new_fps}...")
+
+            self.selected_fps = new_fps
+            self.recorder.video_service.fps_target = new_fps
+
+            self.status.config(text="Status: IDLE")
+            self.fps_combo.config(state="readonly")
+
+        threading.Thread(target=switch_fps, daemon=True).start()
+
+    def _on_fps_change(self, event=None):
+        new_fps = self.fps_var.get()
+        self._change_fps(new_fps)
+
+
 
     def _on_brightness_change(self, value: str) -> None:
         self.recorder.brightness = float(value)

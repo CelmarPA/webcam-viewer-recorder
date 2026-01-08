@@ -52,6 +52,42 @@ def get_camera_capabilities_real(camera_name: str, camera_index: int) -> Dict[Tu
     return capabilities
 
 
-def list_microphones() -> List[str]:
-    devices = sd.query_devices()
-    return [d['name'] for d in devices if d['max_input_channels'] > 0]
+import subprocess
+import re
+from pathlib import Path
+
+FFMPEG_PATH = Path("ffmpeg/ffmpeg.exe")  # caminho relativo ao seu projeto
+
+def list_microphones() -> list[str]:
+    """Lista microfones ativos no Windows via FFmpeg DirectShow, usando caminho do projeto, com debug."""
+    if not FFMPEG_PATH.exists():
+        print("[DEBUG] FFmpeg não encontrado em", FFMPEG_PATH)
+        return []
+
+    try:
+        result = subprocess.run(
+            [str(FFMPEG_PATH), "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+            capture_output=True,
+            text=True,
+            shell=True
+        )
+    except Exception as e:
+        print("[DEBUG] Erro ao executar FFmpeg:", e)
+        return []
+
+    # FFmpeg escreve a lista de dispositivos no stderr
+    lines = result.stderr.splitlines()
+    print("[DEBUG] Saída FFmpeg:")
+    for l in lines:
+        print(l)  # debug de cada linha
+
+    mics = []
+    for line in lines:
+        match = re.search(r'"(.+)" \(audio\)', line)
+        if match:
+            mic_name = match.group(1)
+            mics.append(mic_name)
+            print(f"[DEBUG] Microfone detectado: {mic_name}")
+
+    print(f"[DEBUG] Microfones ativos retornados: {mics}")
+    return mics
