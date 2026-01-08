@@ -32,6 +32,11 @@ MANIFEST
 *.manifest
 *.spec
 
+
+# Ignore ffmpeg binaries
+ffmpeg/
+*.exe
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
