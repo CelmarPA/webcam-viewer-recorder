@@ -1,0 +1,22 @@
+# -------------------------
+# Webcam + Audio Recorder
+# -------------------------
+
+# GUI
+Pillow>=10.0.0
+
+# OpenCV (vídeo e captura de câmera)
+opencv-python>=4.8.1
+
+# Numpy compatível com OpenCV e Python 3.11+
+numpy>=1.26.4
+
+# Áudio
+sounddevice>=0.5.3
+soundfile>=0.12.1
+
+# Tipagem e utilidades
+typing-extensions>=4.7.1
+
+# Optional: para abrir arquivos e pastas no Windows
+pywin32>=305
