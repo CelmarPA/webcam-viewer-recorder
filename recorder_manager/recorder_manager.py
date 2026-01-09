@@ -129,7 +129,10 @@ class RecorderManager:
 
         self._ffmpeg_proc = subprocess.Popen(
             ffmpeg_cmd,
-            stdin=subprocess.PIPE
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
 
         self.audio_service.start_recording(file_path=self._audio_file)
@@ -214,7 +217,13 @@ class RecorderManager:
                 final_output
             ]
 
-            subprocess.run(merge_cmd, check=True)
+            subprocess.run(
+                merge_cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
 
             Path(self._video_file).unlink(missing_ok=True)
             Path(self._audio_file).unlink(missing_ok=True)

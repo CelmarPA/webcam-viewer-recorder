@@ -18,6 +18,7 @@ from recorder_manager.recorder_manager import RecorderManager
 from audio_capture.audio_capture_service import AudioCaptureService
 from video_capture.video_capture_service import VideoCaptureService
 from utils.settings_manager import SettingsManager
+from utils.path_utils import resource_path
 
 
 class AppWindow:
@@ -40,7 +41,7 @@ class AppWindow:
         self.root.minsize(820, 640)
 
         # ---------- ICON ----------
-        icon_path = Path(__file__).parent / "resources" / "icons" / "ico.ico"
+        icon_path = resource_path("resources/icons/ico.ico")
         if icon_path.exists():
             self.root.iconbitmap(default=str(icon_path))
 
@@ -48,7 +49,7 @@ class AppWindow:
         self.settings = SettingsManager()
 
         # ---------- PATHS ----------
-        self.ffmpeg_path = os.path.join(os.getcwd(), "ffmpeg", "ffmpeg.exe")
+        self.ffmpeg_path = str(resource_path("ffmpeg/ffmpeg.exe"))
         if not os.path.exists(self.ffmpeg_path):
             raise FileNotFoundError(
                 "FFmpeg executable not found. Place it in ./ffmpeg/ffmpeg.exe"
