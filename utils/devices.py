@@ -12,8 +12,17 @@ from typing import Dict, List, Tuple
 
 import cv2
 
-DEVICES_JSON: Path = Path("devices.json")
-FFMPEG_PATH: Path = Path("ffmpeg/ffmpeg.exe")
+# ================================================
+# CONFIGURAÇÃO DE PASTA DO PROJETO
+# ================================================
+
+BASE_DIR: Path = Path.cwd() / ".webcam_recorder"
+BASE_DIR.mkdir(exist_ok=True)
+
+DEVICES_JSON: Path = BASE_DIR / "devices.json"
+FFMPEG_PATH: Path = BASE_DIR / "ffmpeg/ffmpeg.exe"
+if not FFMPEG_PATH.exists():
+    FFMPEG_PATH = Path.cwd() / "ffmpeg/ffmpeg.exe"
 
 
 # ==================================================
@@ -28,8 +37,10 @@ def load_devices() -> dict:
     :rtype: dict
     """
     if DEVICES_JSON.exists():
-        return json.loads(DEVICES_JSON.read_text(encoding="utf-8"))
-
+        try:
+            return json.loads(DEVICES_JSON.read_text(encoding="utf-8"))
+        except Exception:
+            return {"cameras": [], "microphones": []}
     return {"cameras": [], "microphones": []}
 
 
@@ -40,10 +51,13 @@ def save_devices(devices: dict) -> None:
     :param devices: Devices dictionary to persist
     :type devices: dict
     """
-    DEVICES_JSON.write_text(
-        json.dumps(devices, indent=4, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    try:
+        DEVICES_JSON.write_text(
+            json.dumps(devices, indent=4, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
 
 
 # ==================================================
@@ -71,11 +85,7 @@ def detect_cameras(max_test: int = 10) -> List[dict]:
     cameras: List[dict] = []
 
     for index in range(max_test):
-        cap = cv2.VideoCapture(
-            index,
-            cv2.CAP_DSHOW if platform.system() == "Windows" else 0,
-        )
-
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW if platform.system() == "Windows" else 0)
         if not cap.isOpened():
             continue
 
@@ -90,6 +100,10 @@ def detect_cameras(max_test: int = 10) -> List[dict]:
 
             if (actual_width, actual_height) == (width, height):
                 resolutions.append(f"{width}x{height}")
+
+        # 🔹 If no resolution is detected, add at least 1280x720
+        if not resolutions:
+            resolutions = ["1280x720"]
 
         cameras.append(
             {

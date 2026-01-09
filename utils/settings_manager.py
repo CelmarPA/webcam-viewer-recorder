@@ -6,24 +6,24 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-from utils.devices import get_cameras, get_microphones
+from utils.devices import detect_cameras, detect_microphones, save_devices
 
 
 class SettingsManager:
     """
     Handles persistence of application data.
 
-    - settings.json : User preferences
-    - devices.json  : Hardware cache (cameras, resolutions, microphones)
+    - .webcam_recorder/settings.json : User preferences
+    - .webcam_recorder/devices.json  : Hardware cache (cameras, microphones)
 
-    The devices cache is generated ONLY if missing.
+    The devices cache is generated ONLY if missing or empty.
     """
 
     def __init__(self) -> None:
         """
         Initialize settings and devices cache directories and load persisted data.
         """
-        self.base_dir: Path = Path.home() / ".webcam_recorder"
+        self.base_dir: Path = Path.cwd() / ".webcam_recorder"
         self.base_dir.mkdir(exist_ok=True)
 
         self.settings_file: Path = self.base_dir / "settings.json"
@@ -35,17 +35,11 @@ class SettingsManager:
         self._load_settings()
         self._load_or_create_devices_cache()
 
-    # ==================================================
-    # SETTINGS (user preferences)
-    # ==================================================
+    # ================= SETTINGS =================
 
     def _load_settings(self) -> None:
-        """
-        Load user settings from settings.json if it exists.
-        """
         if not self.settings_file.exists():
             return
-
         try:
             with open(self.settings_file, "r", encoding="utf-8") as file:
                 self._settings = json.load(file)
@@ -53,26 +47,11 @@ class SettingsManager:
             self._settings = {}
 
     def save(self, data: Optional[dict[str, Any]] = None) -> None:
-        """
-        Public API for saving user settings.
-
-        AppWindow MUST call this method.
-
-        :param data: Optional dictionary with settings to update
-        :type data: Optional[dict[str, Any]]
-        """
         self._save_settings(data)
 
     def _save_settings(self, data: Optional[dict[str, Any]] = None) -> None:
-        """
-        Persist user settings to settings.json.
-
-        :param data: Optional dictionary with settings to update
-        :type data: Optional[dict[str, Any]]
-        """
         if data:
             self._settings.update(data)
-
         try:
             with open(self.settings_file, "w", encoding="utf-8") as file:
                 json.dump(self._settings, file, indent=4)
@@ -80,65 +59,50 @@ class SettingsManager:
             pass
 
     def get(self, key: str, default: Any = None) -> Any:
-        """
-        Retrieve a setting value.
-
-        :param key: Setting key
-        :type key: str
-        :param default: Default value if key does not exist
-        :type default: Any
-        :return: Stored value or default
-        :rtype: Any
-        """
         return self._settings.get(key, default)
 
     def set(self, key: str, value: Any) -> None:
-        """
-        Set a setting value and persist it.
-
-        :param key: Setting key
-        :type key: str
-        :param value: Value to store
-        :type value: Any
-        """
         self._settings[key] = value
         self.save()
 
-    # ==================================================
-    # DEVICES CACHE (hardware)
-    # ==================================================
+    # ================= DEVICES CACHE =================
 
     def _load_or_create_devices_cache(self) -> None:
         """
-        Load devices.json if it exists.
+        Load devices.json if it exists and update missing devices.
 
-        If missing or invalid, generate it using get_cameras()
-        and get_microphones().
+        If cameras or microphones are missing, detect immediately.
+        Afterwards, background update will catch new devices.
         """
+        self._devices = {"cameras": [], "microphones": []}
+
         if self.devices_file.exists():
             try:
                 with open(self.devices_file, "r", encoding="utf-8") as file:
                     self._devices = json.load(file)
-                return
             except Exception:
                 pass
 
-        cameras = get_cameras()
-        microphones = get_microphones()
+        # 🔹 Detect devices immediately if any type is empty
+        updated = False
+        if not self._devices.get("cameras"):
+            self._devices["cameras"] = detect_cameras()
+            updated = True
+        if not self._devices.get("microphones"):
+            self._devices["microphones"] = detect_microphones()
+            updated = True
 
-        self._devices = {
-            "cameras": cameras,
-            "microphones": microphones,
-        }
+        if updated:
+            self._save_devices_cache()
 
-        self._save_devices_cache()
+        # 🔹 Continuous background updates (new cams/mics)
+        from utils.devices import update_devices_background
+        import threading
+        threading.Thread(target=update_devices_background, daemon=True).start()
+
 
     def _save_devices_cache(self) -> None:
-        """
-        Persist devices cache to devices.json.
-
-        This method is called ONLY during initial cache generation.
-        """
+        """Saves the cache of the devices."""
         try:
             with open(self.devices_file, "w", encoding="utf-8") as file:
                 json.dump(self._devices, file, indent=4)
@@ -146,10 +110,5 @@ class SettingsManager:
             pass
 
     def get_devices_cache(self) -> dict[str, Any]:
-        """
-        Return the loaded devices cache.
-
-        :return: Devices cache dictionary
-        :rtype: dict[str, Any]
-        """
+        """Load's devices cache."""
         return self._devices

@@ -1,0 +1,22 @@
+{
+    "cameras": [
+        {
+            "name": "Camera 0",
+            "index": 0,
+            "resolutions": [
+                "1280x720",
+                "800x600",
+                "640x480",
+                "320x240"
+            ]
+        }
+    ],
+    "microphones": [
+        {
+            "name": "Microfone do Headset (Razer Kraken 7.1 V2)"
+        },
+        {
+            "name": "Microfone (HP Webcam HD 2300)"
+        }
+    ]
+}

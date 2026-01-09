@@ -63,16 +63,34 @@ class AppWindow:
 
         # ---------- DEVICES ----------
         devices_cache = self.settings.get_devices_cache()
+        
         self.cameras_info = devices_cache.get("cameras", [])
+        self.cameras = [c["name"] for c in self.cameras_info]
         self.microphones_info = devices_cache.get("microphones", [])
 
+        if self.settings.get("camera") == "No Camera" and self.cameras:
+            self.selected_camera_name = self.cameras[0]
+            self.settings.set("camera", self.selected_camera_name)
+        else:
+            self.selected_camera_name = self.settings.get("camera", self.cameras[0] if self.cameras else None)
+
         if not self.cameras_info:
-            raise RuntimeError("No cameras found in devices.json cache.")
+            messagebox.showwarning(
+                "No cameras detected",
+                "No cameras were found. Please connect a camera and restart the app."
+            )
+            self.cameras_info = [{"name": "No Camera", "index": 0, "resolutions": ["640x480"]}]
+
         if not self.microphones_info:
-            raise RuntimeError("No microphones found in devices.json cache.")
+            messagebox.showwarning(
+                "No microphones detected",
+                "No microphones were found. Please connect a microphone and restart the app."
+            )
+            self.microphones_info = [{"name": "No Microphone"}]
 
         self.cameras = [c["name"] for c in self.cameras_info]
         self.microphones = [m["name"] for m in self.microphones_info]
+
 
         # ---------- INITIAL SELECTION ----------
         self.selected_camera_name = self.settings.get(
@@ -83,8 +101,8 @@ class AppWindow:
         )
 
         camera_cache = next(
-            c for c in self.cameras_info
-            if c["name"] == self.selected_camera_name
+            (c for c in self.cameras_info if c["name"] == self.selected_camera_name),
+            self.cameras_info[0]
         )
         self.selected_camera_index = camera_cache["index"]
 
