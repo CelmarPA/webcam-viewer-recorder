@@ -32,6 +32,8 @@ MANIFEST
 *.manifest
 *.spec
 
+# Ignore settings and device cache
+.webcam_recorder/
 
 # Ignore ffmpeg binaries
 ffmpeg/

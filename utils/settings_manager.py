@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import platform
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -23,8 +25,17 @@ class SettingsManager:
         """
         Initialize settings and devices cache directories and load persisted data.
         """
-        self.base_dir: Path = Path.cwd() / ".webcam_recorder"
-        self.base_dir.mkdir(exist_ok=True)
+        # =================================================
+        # User data folder (single source of truth)
+        # =================================================
+        if platform.system() == "Windows":
+            self.base_dir: Path = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "WebcamRecorder"
+        elif platform.system() == "Darwin":
+            self.base_dir: Path = Path.home() / "Library/Application Support/WebcamRecorder"
+        else:
+            self.base_dir: Path = Path.home() / ".webcam_recorder"
+
+        self.base_dir.mkdir(parents=True, exist_ok=True)
 
         self.settings_file: Path = self.base_dir / "settings.json"
         self.devices_file: Path = self.base_dir / "devices.json"

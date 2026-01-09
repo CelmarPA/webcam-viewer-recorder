@@ -7,23 +7,34 @@ import platform
 import re
 import subprocess
 import threading
+import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import cv2
 
 # ================================================
-# CONFIGURAÇÃO DE PASTA DO PROJETO
+# PROJECT FOLDER CONFIGURATION
 # ================================================
 
-BASE_DIR: Path = Path.cwd() / ".webcam_recorder"
-BASE_DIR.mkdir(exist_ok=True)
+# FFmpeg path
+if getattr(sys, "frozen", False):
+    FFMPEG_PATH = Path(sys._MEIPASS) / "ffmpeg" / "ffmpeg.exe"
+else:
+    FFMPEG_PATH = Path.cwd() / "ffmpeg" / "ffmpeg.exe"
 
-DEVICES_JSON: Path = BASE_DIR / "devices.json"
-FFMPEG_PATH: Path = BASE_DIR / "ffmpeg/ffmpeg.exe"
-if not FFMPEG_PATH.exists():
-    FFMPEG_PATH = Path.cwd() / "ffmpeg/ffmpeg.exe"
+# User data folder (single BASE_DIR)
+if platform.system() == "Windows":
+    BASE_DIR = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "WebcamRecorder"
+elif platform.system() == "Darwin":
+    BASE_DIR = Path.home() / "Library/Application Support/WebcamRecorder"
+else:
+    BASE_DIR = Path.home() / ".webcam_recorder"
 
+BASE_DIR.mkdir(parents=True, exist_ok=True)
+DEVICES_JSON = BASE_DIR / "devices.json"
+SETTINGS_JSON = BASE_DIR / "settings.json"
 
 # ==================================================
 # CACHE HELPERS
