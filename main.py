@@ -1,26 +1,20 @@
 # main.py
+
 from __future__ import annotations
-import os
-import sys
+
 import tkinter as tk
-from pathlib import Path
 
 from app_window import AppWindow
 
-# ================= CONFIGURAÇÃO =================
-# Caminho absoluto do FFmpeg
-FFMPEG_PATH = Path(__file__).parent / "ffmpeg" / "ffmpeg.exe"
-if not FFMPEG_PATH.exists():
-    sys.exit("FFmpeg não encontrado. Coloque ffmpeg.exe na pasta ./ffmpeg/")
 
-# Diretório padrão para salvar vídeos
-OUTPUT_DIR = Path.home() / "Videos"
-OUTPUT_DIR.mkdir(exist_ok=True)
+def main() -> None:
+    """
+    Application entry point.
 
-# ================= RODA APLICATIVO =================
-def main():
+    Initializes the Tkinter root window and starts the main event loop.
+    """
     root = tk.Tk()
-    app = AppWindow(root)
+    AppWindow(root)
     root.mainloop()
 
 
